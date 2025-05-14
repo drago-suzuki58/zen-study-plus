@@ -1,7 +1,7 @@
-import type { ChapterAdvancedClassHeaderLessonSection, ChapterAdvancedClassHeaderSectionMovie, ChapterMovieResourceProps, ChapterNSchoolSectionMovie } from '../../api-caller/v2-material';
+import type { ChapterAdvancedClassHeaderLessonSection, ChapterAdvancedClassHeaderSectionMovie, ChapterMovieResourceProps, ChapterNSchoolSectionMovie, ChapterZenUnivSectionMovie } from '../../api-caller/v2-material';
 import type { ChapterPageInfo, CoursePageInfo, MonthlyReportsPageInfo } from '../../utils/page-info';
-import { concatMap, forkJoin, map, type Observable, of } from 'rxjs';
-import { callApiV2MaterialChapter, callApiV2MaterialCourse, callApiV2ReportProgressMonthly } from '../../api-caller';
+import { concatMap, forkJoin, map, type Observable, of, switchMap } from 'rxjs';
+import { callApiV1Users, callApiV2MaterialChapter, callApiV2MaterialCourse, callApiV2ReportProgressMonthly, callApiV2ZenUnivMaterialChapter } from '../../api-caller';
 
 export type TimeProgressGroup = {
   /**
@@ -105,6 +105,31 @@ const createNSchoolTimeProgress = (
   };
 };
 
+const calcZenUnivSectionsTimeProgressGroup = (
+  sections: ChapterZenUnivSectionMovie[],
+): TimeProgressGroup => (
+  calcMovieResourcesTimeProgressGroup(sections, ({ passed }) => passed)
+);
+
+type ZenUnivTimeProgressData = {
+  allMovie?: TimeProgressGroup;
+  mainMovie?: TimeProgressGroup;
+};
+
+const createZenUnivTimeProgress = (
+  { mainMovie }: ZenUnivTimeProgressData,
+): TimeProgress => {
+  return {
+    primary: mainMovie ?? { goal: 0, current: 0 },
+    groups: [
+      { label: '必修', timeProgressGroup: mainMovie },
+    ].map(({ label, timeProgressGroup }): TimeProgressGroupWithLabel => ({
+      label,
+      ...timeProgressGroup ?? { goal: 0, current: 0 },
+    })),
+  };
+};
+
 type AdvancedTimeProgressData = {
   movie?: TimeProgressGroup;
   lesson?: TimeProgressGroup;
@@ -125,79 +150,107 @@ const createAdvancedTimeProgress = (
   };
 };
 
-export const fetchChapterTimeProgress = (chapterPageInfo: ChapterPageInfo): Observable<TimeProgress> => (
-  callApiV2MaterialChapter(chapterPageInfo).pipe(
-    map(({ course_type, chapter }): TimeProgress => {
-      switch (course_type) {
-        case 'n_school': {
-          const { sections } = chapter;
+export const fetchChapterTimeProgress = (
+  chapterPageInfo: ChapterPageInfo,
+): Observable<TimeProgress> => {
+  return callApiV1Users().pipe(
+    switchMap((userInfo) => {
+      const isZenUniv = userInfo.authority.includes('zen_univ_student');
+      const apiCall = isZenUniv
+        ? callApiV2ZenUnivMaterialChapter
+        : callApiV2MaterialChapter;
 
-          const allMovieSections = sections.filter((section) => (
-            section.resource_type === 'movie'
-          ));
+      return apiCall(chapterPageInfo).pipe(
+        map(({ course_type, chapter }): TimeProgress => {
+          switch (course_type) {
+            case 'n_school': {
+              const { sections } = chapter;
 
-          return createNSchoolTimeProgress({
-            allMovie: calcNSchoolSectionsTimeProgressGroup(allMovieSections),
-            mainMovie: calcNSchoolSectionsTimeProgressGroup(
-              allMovieSections.filter((section) => (
-                section.material_type === 'main'
-              )),
-            ),
-            supplementMovie: calcNSchoolSectionsTimeProgressGroup(
-              allMovieSections.filter((section) => (
-                section.material_type === 'supplement'
-              )),
-            ),
-          });
-        }
+              const allMovieSections = sections.filter((section) => (
+                section.resource_type === 'movie'
+              ));
 
-        case 'advanced': {
-          const { movieSections, lessonSections } = chapter.class_headers.reduce<{
-            movieSections: ChapterAdvancedClassHeaderSectionMovie[];
-            lessonSections: ChapterAdvancedClassHeaderLessonSection[];
-          }>(({ movieSections, lessonSections }, { name, sections }) => {
-            switch (name) {
-              case 'section':
-                return {
-                  movieSections: [
-                    ...movieSections,
-                    ...sections.filter((section) => section.resource_type === 'movie'),
-                  ],
-                  lessonSections,
-                };
-
-              case 'lesson':
-                return {
-                  movieSections,
-                  lessonSections: [
-                    ...lessonSections,
-                    ...sections.filter((section) => section.resource_type === 'lesson'),
-                  ],
-                };
-
-              default:
-                return { movieSections, lessonSections };
+              return createNSchoolTimeProgress({
+                allMovie: calcNSchoolSectionsTimeProgressGroup(allMovieSections),
+                mainMovie: calcNSchoolSectionsTimeProgressGroup(
+                  allMovieSections.filter((section) => (
+                    section.material_type === 'main'
+                  )),
+                ),
+                supplementMovie: calcNSchoolSectionsTimeProgressGroup(
+                  allMovieSections.filter((section) => (
+                    section.material_type === 'supplement'
+                  )),
+                ),
+              });
             }
-          }, { movieSections: [], lessonSections: [] });
 
-          return createAdvancedTimeProgress({
-            movie: calcMovieResourcesTimeProgressGroup(
-              movieSections,
-              ({ progress: { comprehension } }) => (
-                comprehension.good === comprehension.limit
-              ),
-            ),
-            lesson: calcTimeProgressGroup(
-              lessonSections,
-              ({ archive, minute }) => (archive ? archive.second - archive.start_offset : minute * 60),
-              ({ status_label }) => status_label === 'watched',
-            ),
-          });
-        }
-      }
+            case 'zen_univ': {
+              const { sections } = chapter;
+
+              const allMovieSections = sections.filter((section) => (
+                section.resource_type === 'movie'
+              ));
+
+              return createZenUnivTimeProgress({
+                allMovie: calcZenUnivSectionsTimeProgressGroup(allMovieSections),
+                mainMovie: calcZenUnivSectionsTimeProgressGroup(
+                  allMovieSections.filter((section) => (
+                    section.material_type === 'main'
+                  )),
+                ),
+              });
+            }
+
+            case 'advanced': {
+              const { movieSections, lessonSections } = chapter.class_headers.reduce<{
+                movieSections: ChapterAdvancedClassHeaderSectionMovie[];
+                lessonSections: ChapterAdvancedClassHeaderLessonSection[];
+              }>(({ movieSections, lessonSections }, { name, sections }) => {
+                switch (name) {
+                  case 'section':
+                    return {
+                      movieSections: [
+                        ...movieSections,
+                        ...sections.filter((section) => section.resource_type === 'movie'),
+                      ],
+                      lessonSections,
+                    };
+
+                  case 'lesson':
+                    return {
+                      movieSections,
+                      lessonSections: [
+                        ...lessonSections,
+                        ...sections.filter((section) => section.resource_type === 'lesson'),
+                      ],
+                    };
+
+                  default:
+                    return { movieSections, lessonSections };
+                }
+              }, { movieSections: [], lessonSections: [] });
+
+              return createAdvancedTimeProgress({
+                movie: calcMovieResourcesTimeProgressGroup(
+                  movieSections,
+                  ({ progress: { comprehension } }) => (
+                    comprehension.good === comprehension.limit
+                  ),
+                ),
+                lesson: calcTimeProgressGroup(
+                  lessonSections,
+                  ({ archive, minute }) => (archive ? archive.second - archive.start_offset : minute * 60),
+                  ({ status_label }) => status_label === 'watched',
+                ),
+              });
+            }
+          }
+        }),
+      );
     }),
-  )
-);
+  );
+};
 
 export const fetchCourseTimeProgress = (
   coursePageInfo: CoursePageInfo,
@@ -222,6 +275,8 @@ export const fetchCourseTimeProgress = (
       switch (course.type) {
         case 'n_school':
           return of(createNSchoolTimeProgress({}));
+        case 'zen_univ':
+          return of(createZenUnivTimeProgress({}));
         case 'advanced':
           return of(createAdvancedTimeProgress({}));
       }

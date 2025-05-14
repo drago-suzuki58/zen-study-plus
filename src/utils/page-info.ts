@@ -206,3 +206,8 @@ export const matchMyCoursesPage: PageMatcher<MyCoursesPageInfo> = (url) => {
     },
   };
 };
+
+export type UserInfo = {
+  authority: string[];
+  capabilities: string[];
+};

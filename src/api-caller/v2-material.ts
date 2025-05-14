@@ -139,6 +139,67 @@ export type ChapterNSchool = {
     };
 };
 
+export type ChapterZenUnivSectionCommonProps =
+  & PermissionContentProps
+  & ContentURLProps
+  & PassedProps
+  & {
+    material_type: 'main' | 'supplement';
+  };
+
+export type ChapterZenUnivSectionEvaluationProps = {
+  done: boolean;
+};
+
+export type ChapterZenUnivSectionMovie =
+  & ChapterZenUnivSectionCommonProps
+  & ChapterMovieResourceProps
+  & {
+    textbook_info: string;
+  };
+
+export type ChapterZenUnivSectionEvaluationTest =
+  & ChapterZenUnivSectionCommonProps
+  & TotalQuestionProps
+  & ChapterZenUnivSectionEvaluationProps
+  & { resource_type: 'evaluation_test' };
+
+export type ChapterZenUnivSectionEssayTest =
+  & ChapterZenUnivSectionCommonProps
+  & TotalQuestionProps
+  & { resource_type: 'essay_test' };
+
+export type ChapterZenUnivSectionEvaluationReport =
+  & ChapterZenUnivSectionCommonProps
+  & TotalQuestionProps
+  & ChapterZenUnivSectionEvaluationProps
+  & { resource_type: 'evaluation_report' };
+
+export type ChapterZenUnivSectionEssayReport =
+  & ChapterZenUnivSectionCommonProps
+  & TotalQuestionProps
+  & { resource_type: 'essay_report' };
+
+export type ChapterZenUniv = {
+  course_type: 'zen_univ';
+  chapter:
+    & BaseContentProps
+    & OutlineProps
+    & {
+      open_section_index: number;
+      progress:
+        & ChapterProgressProps
+        & StatusProps;
+      sections: (
+        | ChapterZenUnivSectionMovie
+        | ChapterZenUnivSectionEvaluationTest
+        | ChapterZenUnivSectionEssayTest
+        | ChapterZenUnivSectionEvaluationReport
+        | ChapterZenUnivSectionEssayReport
+      )[];
+    };
+};
+
 export type ChapterAdvancedProgressProps = {
   progress: ProgressProps;
 };
@@ -226,7 +287,7 @@ export type ChapterAdvanced = {
     };
 };
 
-export type Chapter = ChapterNSchool | ChapterAdvanced;
+export type Chapter = ChapterNSchool | ChapterZenUniv | ChapterAdvanced;
 
 export type CourseSelectedProps = {
   selected: boolean;
@@ -273,6 +334,41 @@ export type CourseNSchool =
         'passed_materials': 168;
       };
     chapters: CourseNSchoolChapter[];
+  };
+
+export type CourseZenUnivProgressProps = {
+  progress:
+    & StatusProps
+    & ChapterProgressProps
+    & CourseOnCalculationProps;
+};
+
+export type CourseZenUnivChapter =
+  & BaseContentProps
+  & OutlineProps
+  & StatusProps
+  & CourseZenUnivProgressProps
+  & {
+    resource_type: 'chapter';
+    label?: string;
+  };
+
+export type CourseZenUniv =
+  & BaseContentProps
+  & CourseSelectedProps
+  & OutlineProps
+  & CourseSubjectCategoryProps
+  & {
+    type: 'zen_univ';
+    progress:
+      & CourseZenUnivProgressProps
+      & {
+        'total_chapters': 12;
+        'passed_chapters': 9;
+        'total_materials': 200;
+        'passed_materials': 168;
+      };
+    chapters: CourseZenUnivChapter[];
   };
 
 export type CourseAdvancedProgressProps = {
@@ -331,5 +427,5 @@ export type CourseAdvanced =
   };
 
 export type Course = {
-  course: CourseNSchool | CourseAdvanced;
+  course: CourseNSchool | CourseZenUniv | CourseAdvanced;
 };
