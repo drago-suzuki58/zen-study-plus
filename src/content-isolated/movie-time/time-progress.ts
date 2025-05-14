@@ -1,7 +1,7 @@
 import type { ChapterAdvancedClassHeaderLessonSection, ChapterAdvancedClassHeaderSectionMovie, ChapterMovieResourceProps, ChapterNSchoolSectionMovie, ChapterZenUnivSectionMovie } from '../../api-caller/v2-material';
 import type { ChapterPageInfo, CoursePageInfo, MonthlyReportsPageInfo } from '../../utils/page-info';
 import { concatMap, forkJoin, map, type Observable, of, switchMap } from 'rxjs';
-import { callApiV1Users, callApiV2MaterialChapter, callApiV2MaterialCourse, callApiV2ReportProgressMonthly, callApiV2ZenUnivMaterialChapter } from '../../api-caller';
+import { callApiV1Users, callApiV2MaterialChapter, callApiV2MaterialCourse, callApiV2ReportProgressMonthly, callApiV2ZenUnivMaterialChapter, callApiV2ZenUnivMaterialCourse } from '../../api-caller';
 
 export type TimeProgressGroup = {
   /**
@@ -254,35 +254,44 @@ export const fetchChapterTimeProgress = (
 
 export const fetchCourseTimeProgress = (
   coursePageInfo: CoursePageInfo,
-): Observable<TimeProgress> => (
-  callApiV2MaterialCourse(coursePageInfo).pipe(
-    concatMap(({ course }) => {
-      const timeProgressObservableList = course.chapters.flatMap(({ resource_type, id }) => (
-        resource_type === 'chapter'
-          ? [fetchChapterTimeProgress({
-              courseId: coursePageInfo.courseId,
-              chapterId: id,
-            })]
-          : []
-      ));
+): Observable<TimeProgress> => {
+  return callApiV1Users().pipe(
+    switchMap((userInfo) => {
+      const isZenUniv = userInfo.authority.includes('zen_univ_student');
+      const apiCall = isZenUniv
+        ? callApiV2ZenUnivMaterialCourse
+        : callApiV2MaterialCourse;
 
-      if (timeProgressObservableList.length) {
-        return forkJoin(timeProgressObservableList).pipe(
-          map(flatTimeProgress),
-        );
-      }
+      return apiCall(coursePageInfo).pipe(
+        concatMap(({ course }) => {
+          const timeProgressObservableList = course.chapters.flatMap(({ resource_type, id }) => (
+            resource_type === 'chapter'
+              ? [fetchChapterTimeProgress({
+                  courseId: coursePageInfo.courseId,
+                  chapterId: id,
+                })]
+              : []
+          ));
 
-      switch (course.type) {
-        case 'n_school':
-          return of(createNSchoolTimeProgress({}));
-        case 'zen_univ':
-          return of(createZenUnivTimeProgress({}));
-        case 'advanced':
-          return of(createAdvancedTimeProgress({}));
-      }
+          if (timeProgressObservableList.length) {
+            return forkJoin(timeProgressObservableList).pipe(
+              map(flatTimeProgress),
+            );
+          }
+
+          switch (course.type) {
+            case 'n_school':
+              return of(createNSchoolTimeProgress({}));
+            case 'zen_univ':
+              return of(createZenUnivTimeProgress({}));
+            case 'advanced':
+              return of(createAdvancedTimeProgress({}));
+          }
+        }),
+      );
     }),
-  )
-);
+  );
+};
 
 export const fetchMonthlyReportsTimeProgress = (
   monthlyReportsPageInfo: MonthlyReportsPageInfo,

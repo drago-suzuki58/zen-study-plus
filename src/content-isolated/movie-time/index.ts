@@ -83,17 +83,7 @@ const movieTime: ContentFeature = ({ pageContent$, syncOptions$ }) => {
             const clickSubscription = fromEvent(button, 'click').subscribe(() => {
               button.disabled = true;
 
-              if (typeof pageInfo.tab === 'string' && pageInfo.tab !== 'n_school_report') {
-                cleanup.add(
-                  appendMovieTimeComponentToAnchorsIfEnabled({
-                    options: movieTimeOptions.pages.myCourse,
-                    match: matchCoursePage,
-                    fetchTimeProgress: fetchCourseTimeProgress,
-                    isSamePageInfo: isSameCoursePageInfo,
-                    until$,
-                  }),
-                );
-              } else {
+              if (typeof pageInfo.tab === 'string' && pageInfo.tab === 'n_school_report') {
                 const summaryParent = el('div', {}, ['年間レポート']);
                 section.append(summaryParent);
 
@@ -104,6 +94,26 @@ const movieTime: ContentFeature = ({ pageContent$, syncOptions$ }) => {
                     match: matchMonthlyReportsPage,
                     fetchTimeProgress: fetchMonthlyReportsTimeProgress,
                     isSamePageInfo: isSameMonthlyReportsPageInfo,
+                    until$,
+                  }),
+                );
+              } else if (typeof pageInfo.tab === 'string' && pageInfo.tab === 'zen_univ') {
+                cleanup.add(
+                  appendMovieTimeComponentToAnchorsIfEnabled({
+                    options: movieTimeOptions.pages.myCourse,
+                    match: matchCoursePage,
+                    fetchTimeProgress: fetchCourseTimeProgress,
+                    isSamePageInfo: isSameCoursePageInfo,
+                    until$,
+                  }),
+                );
+              } else {
+                cleanup.add(
+                  appendMovieTimeComponentToAnchorsIfEnabled({
+                    options: movieTimeOptions.pages.myCourse,
+                    match: matchCoursePage,
+                    fetchTimeProgress: fetchCourseTimeProgress,
+                    isSamePageInfo: isSameCoursePageInfo,
                     until$,
                   }),
                 );
